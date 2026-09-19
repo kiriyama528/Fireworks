@@ -2,4 +2,4 @@
 
 #festival[data-paused="true"] .animal,#festival[data-paused="true"] #hint{animation-play-state:paused}
 
-#lucky-star{position:absolute;z-index:2;width:104px;height:104px;padding:8px;border:0;background:transparent;touch-action:none;transform:translate(-50%,-50%);filter:drop-shadow(0 0 15px #ffdb7870);-webkit-tap-highlight-color:transparent}#lucky-star svg{width:100%;height:100%;overflow:visible}#lucky-star:focus-visible{outline:3px solid #fff4ba;border-radius:50%}
+.lucky-star{position:absolute;z-index:2;width:104px;height:104px;padding:8px;border:0;background:transparent;touch-action:none;transform:translate(-50%,-50%);filter:drop-shadow(0 0 15px #ffdb7870);-webkit-tap-highlight-color:transparent}.lucky-star svg{width:100%;height:100%;overflow:visible}.lucky-star:focus-visible{outline:3px solid #fff4ba;border-radius:50%}

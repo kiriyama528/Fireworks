@@ -6,33 +6,49 @@ let width=0,height=0,started=false,muted=false,clock=0,last=0,raf=0,count=0,fina
 let rockets=[],particles=[],rings=[],glows=[];
 const gestures=new Map();
 let swipeBlooms=[];
-let luckyStar=null,nextStarAt=Infinity,starRewards=0;
-const starButton=$('#lucky-star');
+const luckyStars=[null,null,null];
+let nextStarAt=Infinity,starRewards=0;
+const starButtons=[$('#lucky-star')];
+starButtons[0].className='lucky-star';
+for(let i=1;i<3;i++){
+ const button=document.createElement('button');button.className='lucky-star';button.hidden=true;
+ button.innerHTML=starButtons[0].innerHTML;
+ button.setAttribute('aria-label','おほしさまをタッチして特別な花火をあげる');
+ $('#festival').append(button);starButtons.push(button);
+}
 function syncStar(){
- starButton.hidden=!luckyStar;
- if(!luckyStar)return;
- const age=clock-luckyStar.born,claimed=luckyStar.claimedAt!==null;
- const progress=claimed?Math.min(1,(clock-luckyStar.claimedAt)/.55):0;
- starButton.style.left=`${luckyStar.x*width}px`;
- starButton.style.top=`${luckyStar.y*height+Math.sin(age*1.7)*3}px`;
- starButton.style.transform=`translate(-50%,-50%) rotate(${claimed?progress*360:Math.sin(age*1.4)*5}deg) scale(${claimed?1+Math.sin(progress*Math.PI)*.25:1+Math.sin(age*2)*.04})`;
- starButton.style.opacity=String(1-progress*.65);
- starButton.style.pointerEvents=claimed?'none':'auto';
+ luckyStars.forEach((star,i)=>{
+  const button=starButtons[i];button.hidden=!star;if(!star)return;
+  const age=clock-star.born,claimed=star.claimedAt!==null;
+  const progress=claimed?Math.min(1,(clock-star.claimedAt)/.55):0;
+  button.style.left=`${star.x*width}px`;
+  button.style.top=`${star.y*height+Math.sin(age*1.7)*3}px`;
+  button.style.transform=`translate(-50%,-50%) rotate(${claimed?progress*360:Math.sin(age*1.4)*5}deg) scale(${claimed?1+Math.sin(progress*Math.PI)*.25:1+Math.sin(age*2)*.04})`;
+  button.style.opacity=String(1-progress*.65);
+  button.style.pointerEvents=claimed?'none':'auto';
+ });
 }
 function claimStar(x,y){
- if(!luckyStar||luckyStar.claimedAt!==null||Math.hypot(x-luckyStar.x*width,y-luckyStar.y*height)>58)return false;
- luckyStar.claimedAt=clock;
+ const star=luckyStars.find(star=>star&&star.claimedAt===null&&Math.hypot(x-star.x*width,y-star.y*height)<=58);
+ if(!star)return false;
+ star.claimedAt=clock;
  sound.tone(880,1320,.22,.045);sound.tone(1320,1760,.25,.035,'sine',.13);
  syncStar();return true;
 }
 function updateStar(){
  if(!started)return;
- if(!luckyStar&&clock>=nextStarAt&&!finale){luckyStar={x:rand(.2,.8),y:rand(.26,.53),born:clock,claimedAt:null};}
- if(luckyStar&&luckyStar.claimedAt!==null&&clock-luckyStar.claimedAt>=.55){
-  const {x,y}=luckyStar;luckyStar=null;nextStarAt=clock+rand(9,13);
+ // Fill one separated position at a time. Unclaimed targets never expire.
+ const empty=luckyStars.indexOf(null);
+ if(empty!==-1&&clock>=nextStarAt&&!finale){
+  luckyStars[empty]={x:[.22,.5,.78][empty],y:[.34,.51,.34][empty],born:clock,claimedAt:null};
+  nextStarAt=clock+4;
+ }
+ luckyStars.forEach((star,i)=>{
+  if(!star||star.claimedAt===null||clock-star.claimedAt<.55)return;
+  const {x,y}=star;luckyStars[i]=null;nextStarAt=clock+2;
   explode({tx:x*width,ty:y*height,type:starRewards++%2?'smile':'heart',big:true,auto:true,color:starRewards%2?'#ff91bb':'#ffd886'});
   animals.forEach((_,i)=>jump(i,true));sound.cheer();
- }
+ });
  syncStar();
 }
 const rand=(a,b)=>a+Math.random()*(b-a);
@@ -174,15 +190,18 @@ function frame(now){if(document.hidden||height>width){raf=0;last=0;return;}const
 function activity(){const paused=document.hidden||innerHeight>innerWidth;$('#festival').setAttribute('data-paused',String(paused));if(paused){gestures.clear();swipeBlooms=[];cancelAnimationFrame(raf);raf=0;last=0;if(sound.context)sound.context.suspend().catch(()=>{});}else{if(started)sound.resume();if(!raf)raf=requestAnimationFrame(frame);}}
 const speaker='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4Z"/>';
 function soundIcon(){$('#sound').innerHTML=speaker+(muted?'<path d="m16 9 6 6m0-6-6 6"/>':'<path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>')+'</svg>';$('#sound').setAttribute('aria-label',muted?'音を出す':'音を消す');$('#sound').setAttribute('aria-pressed',String(muted));}
-$('#start').addEventListener('click',()=>{started=true;nextStarAt=clock+4;sound.init();sound.resume();$('#welcome').hidden=true;$('#sound').hidden=false;$('#hint').hidden=false;rockets=[];particles=[];glows=[];sound.tap();});
+$('#start').addEventListener('click',()=>{started=true;nextStarAt=clock+2;sound.init();sound.resume();$('#welcome').hidden=true;$('#sound').hidden=false;$('#hint').hidden=false;rockets=[];particles=[];glows=[];sound.tap();});
 $('#sound').addEventListener('click',()=>{muted=!muted;sound.toggle();soundIcon();sound.resume();});
 canvas.addEventListener('pointerdown',e=>{e.preventDefault();if(e.pointerType==='mouse'&&e.button!==0)return;canvas.setPointerCapture(e.pointerId);beginGesture(e.pointerId,e.clientX,e.clientY);});
 canvas.addEventListener('pointermove',e=>{e.preventDefault();moveGesture(e.pointerId,e.clientX,e.clientY);});
 canvas.addEventListener('pointerup',e=>{moveGesture(e.pointerId,e.clientX,e.clientY);endGesture(e.pointerId);if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);});
 canvas.addEventListener('pointercancel',e=>endGesture(e.pointerId,true));
 canvas.addEventListener('lostpointercapture',e=>endGesture(e.pointerId,true));
-starButton.addEventListener('pointerdown',e=>{e.preventDefault();if(e.pointerType==='mouse'&&e.button!==0)return;if(started&&width>=height&&luckyStar)touch(luckyStar.x*width,luckyStar.y*height);});
-starButton.addEventListener('click',e=>{if(e.detail===0&&started&&width>=height&&luckyStar)touch(luckyStar.x*width,luckyStar.y*height);});
+starButtons.forEach((button,i)=>{
+ const activate=()=>{const star=luckyStars[i];if(started&&width>=height&&star&&star.claimedAt===null)touch(star.x*width,star.y*height);};
+ button.addEventListener('pointerdown',e=>{e.preventDefault();if(e.pointerType==='mouse'&&e.button!==0)return;activate();});
+ button.addEventListener('click',e=>{if(e.detail===0)activate();});
+});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 window.addEventListener('resize',()=>{resize();activity();});document.addEventListener('visibilitychange',activity);window.addEventListener('pagehide',()=>{if(sound.context)sound.context.suspend().catch(()=>{});});window.addEventListener('pageshow',activity);
 resize();soundIcon();
