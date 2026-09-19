@@ -6,6 +6,35 @@ let width=0,height=0,started=false,muted=false,clock=0,last=0,raf=0,count=0,fina
 let rockets=[],particles=[],rings=[],glows=[];
 const gestures=new Map();
 let swipeBlooms=[];
+let luckyStar=null,nextStarAt=Infinity,starRewards=0;
+const starButton=$('#lucky-star');
+function syncStar(){
+ starButton.hidden=!luckyStar;
+ if(!luckyStar)return;
+ const age=clock-luckyStar.born,claimed=luckyStar.claimedAt!==null;
+ const progress=claimed?Math.min(1,(clock-luckyStar.claimedAt)/.55):0;
+ starButton.style.left=`${luckyStar.x*width}px`;
+ starButton.style.top=`${luckyStar.y*height+Math.sin(age*1.7)*3}px`;
+ starButton.style.transform=`translate(-50%,-50%) rotate(${claimed?progress*360:Math.sin(age*1.4)*5}deg) scale(${claimed?1+Math.sin(progress*Math.PI)*.25:1+Math.sin(age*2)*.04})`;
+ starButton.style.opacity=String(1-progress*.65);
+ starButton.style.pointerEvents=claimed?'none':'auto';
+}
+function claimStar(x,y){
+ if(!luckyStar||luckyStar.claimedAt!==null||Math.hypot(x-luckyStar.x*width,y-luckyStar.y*height)>58)return false;
+ luckyStar.claimedAt=clock;
+ sound.tone(880,1320,.22,.045);sound.tone(1320,1760,.25,.035,'sine',.13);
+ syncStar();return true;
+}
+function updateStar(){
+ if(!started)return;
+ if(!luckyStar&&clock>=nextStarAt&&!finale){luckyStar={x:rand(.2,.8),y:rand(.26,.53),born:clock,claimedAt:null};}
+ if(luckyStar&&luckyStar.claimedAt!==null&&clock-luckyStar.claimedAt>=.55){
+  const {x,y}=luckyStar;luckyStar=null;nextStarAt=clock+rand(9,13);
+  explode({tx:x*width,ty:y*height,type:starRewards++%2?'smile':'heart',big:true,auto:true,color:starRewards%2?'#ff91bb':'#ffd886'});
+  animals.forEach((_,i)=>jump(i,true));sound.cheer();
+ }
+ syncStar();
+}
 const rand=(a,b)=>a+Math.random()*(b-a);
 const animals=[];
 for(let i=0;i<4;i++){
@@ -89,11 +118,12 @@ function explode(r){
 function touch(x,y){
  if(!started||height>width)return;sound.resume();$('#hint').hidden=true;
  rings.push({x,y,age:0});if(rings.length>36)rings.shift();sound.tap();
+ if(claimStar(x,y))return true;
  if(y>height*.8){jump(Math.max(0,Math.min(3,Math.round((x/width-.35)/.1))));sound.cheer();return;}
  if(clock-lastLaunch<.085||rockets.length>=10)return;lastLaunch=clock;launch(x,y);
 }
 function beginGesture(id,x,y){
- touch(x,y);
+ if(touch(x,y))return;
  if(started&&width>=height&&y<=height*.8&&gestures.size<5)gestures.set(id,{points:[{x,y}],length:0});
 }
 function moveGesture(id,x,y){
@@ -117,7 +147,7 @@ function endGesture(id,cancel=false){
  animals.forEach((_,i)=>jump(i,true));sound.cheer();
 }
 function update(dt){
- clock+=dt;for(const bloom of swipeBlooms){if(bloom.at<=clock){explode(bloom);bloom.done=true;}}swipeBlooms=swipeBlooms.filter(b=>!b.done);animals.forEach((a,i)=>{if(a.cheerUntil&&clock>=a.cheerUntil){a.src=`./assets/animal-${i}.svg`;a.cheerUntil=0;}});
+ clock+=dt;updateStar();for(const bloom of swipeBlooms){if(bloom.at<=clock){explode(bloom);bloom.done=true;}}swipeBlooms=swipeBlooms.filter(b=>!b.done);animals.forEach((a,i)=>{if(a.cheerUntil&&clock>=a.cheerUntil){a.src=`./assets/animal-${i}.svg`;a.cheerUntil=0;}});
  if(started){sound.ambience();if(finale){let age=clock-finale.start;const times=[0,.45,.9,1.35,1.8,2.6,3.3];if(finale.next<times.length&&age>=times[finale.next]){const i=finale.next++;launch(width*[.18,.82,.32,.68,.5,.27,.5][i],height*[.34,.3,.24,.35,.23,.32,.28][i],{auto:true,big:i===6,color:i===6?'#ffdf91':palette[i%6],type:i===6?'willow':undefined});if(i===6){animals.forEach((_,i)=>jump(i,true));sound.cheer();}}if(age>=5){finale=null;count=0;}}}
  for(const r of rockets){r.age+=dt;const t=Math.min(1,r.age/r.duration);r.x=r.fromX+(r.tx-r.fromX)*t;r.y=height*.81+(r.ty-height*.81)*(1-Math.pow(1-t,1.5));if(t>=1){r.done=true;explode(r);}}
  rockets=rockets.filter(r=>!r.done);
@@ -144,13 +174,15 @@ function frame(now){if(document.hidden||height>width){raf=0;last=0;return;}const
 function activity(){const paused=document.hidden||innerHeight>innerWidth;$('#festival').setAttribute('data-paused',String(paused));if(paused){gestures.clear();swipeBlooms=[];cancelAnimationFrame(raf);raf=0;last=0;if(sound.context)sound.context.suspend().catch(()=>{});}else{if(started)sound.resume();if(!raf)raf=requestAnimationFrame(frame);}}
 const speaker='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4Z"/>';
 function soundIcon(){$('#sound').innerHTML=speaker+(muted?'<path d="m16 9 6 6m0-6-6 6"/>':'<path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>')+'</svg>';$('#sound').setAttribute('aria-label',muted?'音を出す':'音を消す');$('#sound').setAttribute('aria-pressed',String(muted));}
-$('#start').addEventListener('click',()=>{started=true;sound.init();sound.resume();$('#welcome').hidden=true;$('#sound').hidden=false;$('#hint').hidden=false;rockets=[];particles=[];glows=[];sound.tap();});
+$('#start').addEventListener('click',()=>{started=true;nextStarAt=clock+4;sound.init();sound.resume();$('#welcome').hidden=true;$('#sound').hidden=false;$('#hint').hidden=false;rockets=[];particles=[];glows=[];sound.tap();});
 $('#sound').addEventListener('click',()=>{muted=!muted;sound.toggle();soundIcon();sound.resume();});
 canvas.addEventListener('pointerdown',e=>{e.preventDefault();if(e.pointerType==='mouse'&&e.button!==0)return;canvas.setPointerCapture(e.pointerId);beginGesture(e.pointerId,e.clientX,e.clientY);});
 canvas.addEventListener('pointermove',e=>{e.preventDefault();moveGesture(e.pointerId,e.clientX,e.clientY);});
 canvas.addEventListener('pointerup',e=>{moveGesture(e.pointerId,e.clientX,e.clientY);endGesture(e.pointerId);if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);});
 canvas.addEventListener('pointercancel',e=>endGesture(e.pointerId,true));
 canvas.addEventListener('lostpointercapture',e=>endGesture(e.pointerId,true));
+starButton.addEventListener('pointerdown',e=>{e.preventDefault();if(e.pointerType==='mouse'&&e.button!==0)return;if(started&&width>=height&&luckyStar)touch(luckyStar.x*width,luckyStar.y*height);});
+starButton.addEventListener('click',e=>{if(e.detail===0&&started&&width>=height&&luckyStar)touch(luckyStar.x*width,luckyStar.y*height);});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 window.addEventListener('resize',()=>{resize();activity();});document.addEventListener('visibilitychange',activity);window.addEventListener('pagehide',()=>{if(sound.context)sound.context.suspend().catch(()=>{});});window.addEventListener('pageshow',activity);
 resize();soundIcon();

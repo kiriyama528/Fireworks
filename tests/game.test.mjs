@@ -26,5 +26,15 @@ beginGesture(2,100,100);moveGesture(2,110,100);endGesture(2);assert.equal(swipeB
 beginGesture(3,100,100);moveGesture(3,300,100);endGesture(3,true);assert.equal(swipeBlooms.length,0);
 for(let i=0;i<20;i++){beginGesture(i,100,100);moveGesture(i,600,100);endGesture(i);}assert.ok(swipeBlooms.length<=48);
 beginGesture(9,100,100);document.hidden=true;activity();assert.equal(gestures.size,0);assert.equal(swipeBlooms.length,0);
-console.log('PASS: swipe, cancellation, multitouch bounds, repeated finales, rapid-input bounds, edge shapes, audience input, visibility and rotation');
+document.hidden=false;activity();finale=null;rockets=[];particles=[];nextStarAt=clock+4;
+step(3);assert.equal(luckyStar,null);step(1.1);assert.ok(luckyStar);const waiting=luckyStar;
+step(30);assert.equal(luckyStar,waiting);assert.equal(starRewards,0);
+const sx=luckyStar.x*width,sy=luckyStar.y*height;
+touch(10,10);assert.equal(luckyStar.claimedAt,null);assert.ok(rockets.length>0);
+const launches=rockets.length;beginGesture(51,sx+50,sy);assert.equal(gestures.has(51),false);assert.equal(rockets.length,launches);
+claimStar(sx,sy);step(.6);assert.equal(starRewards,1);assert.equal(luckyStar,null);assert.ok(particles.length>0);
+step(14);assert.ok(luckyStar);const next=luckyStar;document.hidden=true;activity();assert.equal(luckyStar,next);
+innerWidth=390;innerHeight=844;resize();assert.equal(luckyStar,next);innerWidth=844;innerHeight=390;resize();
+document.hidden=false;activity();touch(luckyStar.x*width,luckyStar.y*height);step(.6);assert.equal(starRewards,2);
+console.log('PASS: persistent star, generous hit area, single reward, respawn and rotation; swipe, cancellation, multitouch bounds, repeated finales, rapid-input bounds, edge shapes, audience input, visibility and rotation');
 `,context);
