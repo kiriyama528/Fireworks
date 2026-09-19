@@ -1,0 +1,25 @@
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const elements=new Map();
+const element=()=>({hidden:false,style:{},classList:{add(){},remove(){}},setAttribute(){},append(){},addEventListener(type,fn){this[type]=fn;}});
+const drawing=new Proxy({createRadialGradient:()=>({addColorStop(){}})},{get:(o,k)=>o[k]||(()=>{})});
+const document={hidden:false,querySelector(s){if(!elements.has(s))elements.set(s,element());return elements.get(s);},createElement:element,addEventListener(type,fn){this[type]=fn;}};
+document.querySelector('#sky').getContext=()=>drawing;
+const context=vm.createContext({document,window:{addEventListener(){}},innerWidth:844,innerHeight:390,devicePixelRatio:2,Image:class{},requestAnimationFrame:()=>1,cancelAnimationFrame(){},console,assert});
+vm.runInContext(readFileSync(new URL('../game.js',import.meta.url),'utf8')+`
+const step=seconds=>{for(let i=0;i<Math.ceil(seconds/.016);i++)update(.016);};
+started=true;rockets=[];particles=[];glows=[];
+for(let i=0;i<14;i++){touch(150+i*25,110);step(.85);}
+assert.equal(count,14);assert.equal(finale,null);
+touch(410,100);step(.85);assert.ok(finale);step(5.2);assert.equal(finale,null);assert.equal(count,0);
+for(let i=0;i<15;i++){touch(200+i*20,110);step(.85);}assert.ok(finale);step(5.2);assert.equal(count,0);
+for(let i=0;i<1000;i++)touch(300,100);assert.ok(rockets.length<=10);assert.ok(rings.length<=36);assert.ok(particles.length<=1500);
+step(4);assert.equal(rockets.length,0);
+for(const type of ['round','ring','willow','star','heart','smile']){explode({tx:2,ty:2,type,color:'#ffd886',auto:true});}draw();assert.ok(particles.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.vx)));
+const before=count;touch(400,380);assert.equal(count,before);
+document.hidden=true;activity();assert.equal(raf,0);document.hidden=false;activity();assert.equal(raf,1);
+innerWidth=390;innerHeight=844;resize();activity();assert.equal(raf,0);const n=rockets.length;touch(100,100);assert.equal(rockets.length,n);
+innerWidth=844;innerHeight=390;resize();activity();assert.equal(raf,1);assert.equal(particles.length,0);
+console.log('PASS: repeated finales, rapid-input bounds, edge shapes, audience input, visibility and rotation');
+`,context);
